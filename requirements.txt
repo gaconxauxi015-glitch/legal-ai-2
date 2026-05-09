@@ -1,6 +1,6 @@
+google-genai
 streamlit
-google-generativeai
 PyPDF2
 python-docx
+pillow
 pytesseract
-Pillow
