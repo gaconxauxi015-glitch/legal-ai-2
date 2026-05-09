@@ -163,4 +163,4 @@ elif mode == "🧾 Tạo hợp đồng từ mô tả":
     if st.button("Tạo hợp đồng") and desc:
         result = generate_contract(desc)
         st.write(result)
-            st.write(ask_ai(prompt))
+           
