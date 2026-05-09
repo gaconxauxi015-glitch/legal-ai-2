@@ -2,8 +2,10 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 from docx import Document
+from docx.shared import Pt
 from PIL import Image
 import pytesseract
+import io
 
 # ======================
 # AI CONFIG
@@ -11,17 +13,14 @@ import pytesseract
 genai.configure(api_key=st.secrets["API_KEY"])
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-st.title("⚖️ Legal AI PRO MAX - Contract & Document AI")
+st.title("⚖️ Legal AI PRO MAX - Contract Editor + Word Export")
 
 # ======================
-# READ FILE FUNCTIONS
+# READ FILES
 # ======================
 def read_pdf(file):
     reader = PdfReader(file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text() or ""
-    return text
+    return "\n".join([p.extract_text() or "" for p in reader.pages])
 
 def read_docx(file):
     doc = Document(file)
@@ -32,8 +31,7 @@ def read_txt(file):
 
 def read_image(file):
     image = Image.open(file)
-    text = pytesseract.image_to_string(image, lang="eng+vie")
-    return text
+    return pytesseract.image_to_string(image, lang="eng+vie")
 
 def read_file(file):
     if file.name.endswith(".pdf"):
@@ -42,28 +40,8 @@ def read_file(file):
         return read_docx(file)
     elif file.name.endswith(".txt"):
         return read_txt(file)
-    elif file.name.endswith((".png", ".jpg", ".jpeg")):
-        return read_image(file)
     else:
-        return ""
-
-# ======================
-# UPLOAD MULTIPLE FILES
-# ======================
-uploaded_files = st.file_uploader(
-    "📂 Upload tài liệu (PDF/DOCX/TXT/ẢNH SCAN)",
-    type=["pdf", "docx", "txt", "png", "jpg", "jpeg"],
-    accept_multiple_files=True
-)
-
-all_text = ""
-
-if uploaded_files:
-    for file in uploaded_files:
-        all_text += f"\n\n===== FILE: {file.name} =====\n"
-        all_text += read_file(file)
-
-    st.success("Đã đọc toàn bộ tài liệu + ảnh scan")
+        return read_image(file)
 
 # ======================
 # AI FUNCTIONS
@@ -73,21 +51,67 @@ def ask_ai(prompt):
 
 def generate_contract(description):
     prompt = f"""
-Bạn là luật sư chuyên nghiệp tại Việt Nam.
+Bạn là luật sư chuyên nghiệp.
 
-Hãy tạo hợp đồng hoàn chỉnh:
-
-- Văn phong pháp lý chuẩn
+Tạo hợp đồng đầy đủ:
 - Điều khoản rõ ràng
-- Có quyền & nghĩa vụ
-- Có thanh toán
-- Có chấm dứt hợp đồng
-- Có tranh chấp
+- Quyền & nghĩa vụ
+- Thanh toán
+- Chấm dứt hợp đồng
+- Tranh chấp
 
 Mô tả:
 {description}
 """
     return ask_ai(prompt)
+
+def improve_contract(text):
+    prompt = f"""
+Bạn là luật sư cao cấp.
+
+Hãy:
+- Sửa hợp đồng này cho chặt chẽ hơn
+- Loại bỏ rủi ro pháp lý
+- Viết lại chuyên nghiệp hơn
+
+HỢP ĐỒNG:
+{text}
+"""
+    return ask_ai(prompt)
+
+# ======================
+# EXPORT WORD
+# ======================
+def export_word(content, filename="contract.docx"):
+    doc = Document()
+    doc.add_heading("LEGAL CONTRACT", 0)
+
+    for line in content.split("\n"):
+        p = doc.add_paragraph(line)
+        p.style.font.size = Pt(11)
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+# ======================
+# UPLOAD
+# ======================
+files = st.file_uploader(
+    "📂 Upload tài liệu / hợp đồng / ảnh scan",
+    type=["pdf", "docx", "txt", "png", "jpg", "jpeg"],
+    accept_multiple_files=True
+)
+
+all_text = ""
+
+if files:
+    for f in files:
+        all_text += f"\n\n=== {f.name} ===\n"
+        all_text += read_file(f)
+
+    st.success("Đã đọc toàn bộ tài liệu")
 
 # ======================
 # MODE
@@ -95,93 +119,63 @@ Mô tả:
 mode = st.selectbox(
     "Chọn chức năng",
     [
-        "📊 Phân tích tổng hợp",
-        "⚠️ Tìm rủi ro pháp lý",
-        "📝 Tóm tắt hợp đồng",
-        "🔍 Hỏi đáp theo tài liệu",
-        "🧾 Tạo hợp đồng từ mô tả"
+        "📊 Phân tích",
+        "⚠️ Tìm rủi ro",
+        "📝 Tóm tắt",
+        "✍️ Sửa hợp đồng (AI rewrite)",
+        "🧾 Tạo hợp đồng mới"
     ]
 )
 
 # ======================
 # RUN
 # ======================
+if mode != "🧾 Tạo hợp đồng mới":
 
-if mode != "🧾 Tạo hợp đồng từ mô tả":
+    if all_text and st.button("🚀 Thực hiện"):
 
-    if all_text:
+        if mode == "📊 Phân tích":
+            result = ask_ai("Phân tích hợp đồng:\n" + all_text)
 
-        if st.button("🚀 Thực hiện"):
+        elif mode == "⚠️ Tìm rủi ro":
+            result = ask_ai("Tìm rủi ro pháp lý:\n" + all_text)
 
-            if mode == "📊 Phân tích tổng hợp":
-                prompt = f"""
-Phân tích tài liệu:
-- Nội dung chính
-- Điều khoản quan trọng
-- Rủi ro pháp lý
-- Gợi ý cải thiện
+        elif mode == "📝 Tóm tắt":
+            result = ask_ai("Tóm tắt hợp đồng:\n" + all_text)
 
-TÀI LIỆU:
-{all_text}
-"""
-                st.write(ask_ai(prompt))
+        elif mode == "✍️ Sửa hợp đồng (AI rewrite)":
+            result = improve_contract(all_text)
 
-            elif mode == "⚠️ Tìm rủi ro pháp lý":
-                prompt = f"""
-Tìm rủi ro:
-- Điều khoản bất lợi
-- Mơ hồ
-- Tranh chấp
-- Mức độ rủi ro
-- Cách sửa
+        st.write(result)
 
-TÀI LIỆU:
-{all_text}
-"""
-                st.write(ask_ai(prompt))
+        # ======================
+        # EXPORT WORD BUTTON
+        # ======================
+        file = export_word(result)
 
-            elif mode == "📝 Tóm tắt hợp đồng":
-                prompt = f"""
-Tóm tắt:
-- Nội dung chính
-- Nghĩa vụ
-- Điều khoản quan trọng
+        st.download_button(
+            label="⬇️ Tải file Word",
+            data=file,
+            file_name="legal_contract.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
-TÀI LIỆU:
-{all_text}
-"""
-                st.write(ask_ai(prompt))
-
-            elif mode == "🔍 Hỏi đáp theo tài liệu":
-                question = st.text_input("Nhập câu hỏi")
-                if question:
-                    prompt = f"""
-Dựa trên tài liệu trả lời chính xác:
-
-TÀI LIỆU:
-{all_text}
-
-CÂU HỎI:
-{question}
-"""
-                    st.write(ask_ai(prompt))
-
-    else:
-        st.info("Upload tài liệu hoặc ảnh scan trước")
-
-# ======================
-# CREATE CONTRACT
-# ======================
 else:
 
     st.subheader("🧾 Tạo hợp đồng từ mô tả")
 
-    description = st.text_area("Nhập mô tả hợp đồng")
+    desc = st.text_area("Nhập mô tả hợp đồng")
 
     if st.button("Tạo hợp đồng"):
 
-        if description:
-            result = generate_contract(description)
-            st.write(result)
-        else:
-            st.warning("Nhập mô tả trước")
+        result = generate_contract(desc)
+        st.write(result)
+
+        file = export_word(result)
+
+        st.download_button(
+            label="⬇️ Tải hợp đồng Word",
+            data=file,
+            file_name="contract.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
