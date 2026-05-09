@@ -21,7 +21,7 @@ genai.configure(api_key=API_KEY)
 # ======================
 def get_model():
     try:
-        return genai.GenerativeModel("gemini-1.5-flash")
+        return genai.GenerativeModel("gemini-pro")
     except:
         try:
             return genai.GenerativeModel("gemini-1.5-pro")
