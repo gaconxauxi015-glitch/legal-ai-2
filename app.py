@@ -1,22 +1,10 @@
 import streamlit as st
-from google import genai
 from PyPDF2 import PdfReader
 from docx import Document
 from PIL import Image
 import pytesseract
 
-# ======================
-# API KEY
-# ======================
-API_KEY = st.secrets.get("API_KEY")
-
-if not API_KEY:
-    st.error("Thiếu API KEY")
-    st.stop()
-
-client = genai.Client(api_key=API_KEY)
-
-st.title("⚖️ Legal AI PRO (Stable Version)")
+st.title("⚖️ Legal AI OFFLINE SAFE MODE")
 
 # ======================
 # READ FILE
@@ -47,29 +35,57 @@ def read_file(file):
     return read_image(file)
 
 # ======================
-# SAFE AI CALL (KHÔNG LỖI MODEL)
+# SIMPLE AI RULE ENGINE (KHÔNG API)
 # ======================
-def ask_ai(prompt):
-    try:
-        res = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt
-        )
-        return res.text
-    except Exception as e:
-        return f"AI Error: {str(e)}"
+def analyze(text):
+    return f"""
+📊 PHÂN TÍCH CƠ BẢN
+
+- Độ dài tài liệu: {len(text)} ký tự
+
+⚠️ Gợi ý kiểm tra:
+- Điều khoản thanh toán
+- Điều khoản chấm dứt
+- Điều khoản trách nhiệm
+- Điều khoản phạt vi phạm
+
+📄 NỘI DUNG:
+{text[:3000]}
+"""
+
+def risk(text):
+    return """
+⚠️ RỦI RO CÓ THỂ GẶP:
+
+- Điều khoản mơ hồ
+- Thiếu điều khoản phạt
+- Thiếu điều khoản tranh chấp
+- Không rõ nghĩa vụ hai bên
+
+👉 Hãy kiểm tra kỹ các phần thanh toán + chấm dứt hợp đồng
+""" + text[:2000]
+
+def create_contract(desc):
+    return f"""
+🧾 HỢP ĐỒNG MẪU (GENERATED TEMPLATE)
+
+Mô tả:
+{desc}
+
+1. Bên A: ........
+2. Bên B: ........
+3. Nội dung hợp đồng: ........
+4. Thanh toán: ........
+5. Chấm dứt: ........
+6. Tranh chấp: ........
+"""
 
 # ======================
 # UI
 # ======================
 mode = st.selectbox(
     "Chọn chức năng",
-    [
-        "Phân tích hợp đồng",
-        "Tìm rủi ro pháp lý",
-        "Tạo hợp đồng từ mô tả",
-        "Hỏi đáp tài liệu"
-    ]
+    ["Phân tích", "Rủi ro", "Tạo hợp đồng"]
 )
 
 file = st.file_uploader("Upload file", type=["pdf","docx","txt","png","jpg","jpeg"])
@@ -80,35 +96,18 @@ if file:
     st.success("Đã đọc file")
 
 # ======================
-# CREATE CONTRACT
+# RUN
 # ======================
-def create_contract(desc):
-    return ask_ai(f"""
-Bạn là luật sư Việt Nam.
-Tạo hợp đồng đầy đủ, rõ ràng, đúng luật:
+if mode == "Phân tích":
+    if file and st.button("Chạy"):
+        st.write(analyze(text))
 
-Mô tả:
-{desc}
-""")
+if mode == "Rủi ro":
+    if file and st.button("Chạy"):
+        st.write(risk(text))
 
-# ======================
-# LOGIC
-# ======================
-if mode == "Phân tích hợp đồng":
-    if file and st.button("Phân tích"):
-        st.write(ask_ai("Phân tích hợp đồng:\n" + text))
-
-elif mode == "Tìm rủi ro pháp lý":
-    if file and st.button("Tìm rủi ro"):
-        st.write(ask_ai("Tìm rủi ro:\n" + text))
-
-elif mode == "Hỏi đáp tài liệu":
-    if file:
-        q = st.text_input("Câu hỏi")
-        if q and st.button("Trả lời"):
-            st.write(ask_ai(text + "\n\nCâu hỏi: " + q))
-
-elif mode == "Tạo hợp đồng từ mô tả":
+if mode == "Tạo hợp đồng":
     desc = st.text_area("Mô tả hợp đồng")
     if st.button("Tạo"):
+        st.write(create_contract(desc))o"):
         st.write(create_contract(desc))
