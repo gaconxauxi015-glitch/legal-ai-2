@@ -2,7 +2,6 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 from docx import Document
-from docx.shared import Pt
 from PIL import Image
 import pytesseract
 import io
@@ -13,7 +12,7 @@ import io
 genai.configure(api_key=st.secrets["API_KEY"])
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-st.title("⚖️ Legal AI PRO MAX - Contract Editor + Word Export")
+st.title("⚖️ Legal AI ULTRA - Compare & Risk Detector")
 
 # ======================
 # READ FILES
@@ -44,74 +43,10 @@ def read_file(file):
         return read_image(file)
 
 # ======================
-# AI FUNCTIONS
+# AI CORE
 # ======================
 def ask_ai(prompt):
     return model.generate_content(prompt).text
-
-def generate_contract(description):
-    prompt = f"""
-Bạn là luật sư chuyên nghiệp.
-
-Tạo hợp đồng đầy đủ:
-- Điều khoản rõ ràng
-- Quyền & nghĩa vụ
-- Thanh toán
-- Chấm dứt hợp đồng
-- Tranh chấp
-
-Mô tả:
-{description}
-"""
-    return ask_ai(prompt)
-
-def improve_contract(text):
-    prompt = f"""
-Bạn là luật sư cao cấp.
-
-Hãy:
-- Sửa hợp đồng này cho chặt chẽ hơn
-- Loại bỏ rủi ro pháp lý
-- Viết lại chuyên nghiệp hơn
-
-HỢP ĐỒNG:
-{text}
-"""
-    return ask_ai(prompt)
-
-# ======================
-# EXPORT WORD
-# ======================
-def export_word(content, filename="contract.docx"):
-    doc = Document()
-    doc.add_heading("LEGAL CONTRACT", 0)
-
-    for line in content.split("\n"):
-        p = doc.add_paragraph(line)
-        p.style.font.size = Pt(11)
-
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
-
-# ======================
-# UPLOAD
-# ======================
-files = st.file_uploader(
-    "📂 Upload tài liệu / hợp đồng / ảnh scan",
-    type=["pdf", "docx", "txt", "png", "jpg", "jpeg"],
-    accept_multiple_files=True
-)
-
-all_text = ""
-
-if files:
-    for f in files:
-        all_text += f"\n\n=== {f.name} ===\n"
-        all_text += read_file(f)
-
-    st.success("Đã đọc toàn bộ tài liệu")
 
 # ======================
 # MODE
@@ -119,63 +54,109 @@ if files:
 mode = st.selectbox(
     "Chọn chức năng",
     [
-        "📊 Phân tích",
-        "⚠️ Tìm rủi ro",
-        "📝 Tóm tắt",
-        "✍️ Sửa hợp đồng (AI rewrite)",
-        "🧾 Tạo hợp đồng mới"
+        "📊 Phân tích hợp đồng",
+        "⚠️ Tìm rủi ro pháp lý",
+        "🆚 So sánh 2 hợp đồng",
+        "🔍 Highlight điều khoản nguy hiểm"
     ]
 )
 
 # ======================
-# RUN
+# UPLOAD
 # ======================
-if mode != "🧾 Tạo hợp đồng mới":
+if mode in ["📊 Phân tích hợp đồng", "⚠️ Tìm rủi ro pháp lý"]:
 
-    if all_text and st.button("🚀 Thực hiện"):
+    file = st.file_uploader("Upload hợp đồng", type=["pdf","docx","txt","png","jpg","jpeg"])
 
-        if mode == "📊 Phân tích":
-            result = ask_ai("Phân tích hợp đồng:\n" + all_text)
+    if file:
+        text = read_file(file)
 
-        elif mode == "⚠️ Tìm rủi ro":
-            result = ask_ai("Tìm rủi ro pháp lý:\n" + all_text)
+        if st.button("Thực hiện"):
 
-        elif mode == "📝 Tóm tắt":
-            result = ask_ai("Tóm tắt hợp đồng:\n" + all_text)
+            if mode == "📊 Phân tích hợp đồng":
+                prompt = f"""
+Phân tích hợp đồng:
+- Nội dung chính
+- Điều khoản quan trọng
+- Nhận xét pháp lý
 
-        elif mode == "✍️ Sửa hợp đồng (AI rewrite)":
-            result = improve_contract(all_text)
+{ text }
+"""
+                st.write(ask_ai(prompt))
 
-        st.write(result)
+            if mode == "⚠️ Tìm rủi ro pháp lý":
+                prompt = f"""
+Tìm rủi ro pháp lý:
+- Điều khoản bất lợi
+- Mơ hồ
+- Thiếu sót
+- Mức độ rủi ro (cao/trung bình/thấp)
 
-        # ======================
-        # EXPORT WORD BUTTON
-        # ======================
-        file = export_word(result)
+{ text }
+"""
+                st.write(ask_ai(prompt))
 
-        st.download_button(
-            label="⬇️ Tải file Word",
-            data=file,
-            file_name="legal_contract.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+# ======================
+# COMPARE 2 CONTRACTS
+# ======================
+elif mode == "🆚 So sánh 2 hợp đồng":
 
-else:
+    col1, col2 = st.columns(2)
 
-    st.subheader("🧾 Tạo hợp đồng từ mô tả")
+    with col1:
+        file1 = st.file_uploader("Hợp đồng A", type=["pdf","docx","txt","png","jpg","jpeg"], key="a")
 
-    desc = st.text_area("Nhập mô tả hợp đồng")
+    with col2:
+        file2 = st.file_uploader("Hợp đồng B", type=["pdf","docx","txt","png","jpg","jpeg"], key="b")
 
-    if st.button("Tạo hợp đồng"):
+    if file1 and file2:
 
-        result = generate_contract(desc)
-        st.write(result)
+        text1 = read_file(file1)
+        text2 = read_file(file2)
 
-        file = export_word(result)
+        if st.button("So sánh"):
 
-        st.download_button(
-            label="⬇️ Tải hợp đồng Word",
-            data=file,
-            file_name="contract.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+            prompt = f"""
+So sánh 2 hợp đồng:
+
+HỢP ĐỒNG A:
+{text1}
+
+HỢP ĐỒNG B:
+{text2}
+
+Yêu cầu:
+- điểm giống nhau
+- điểm khác nhau
+- hợp đồng nào lợi hơn
+- hợp đồng nào rủi ro hơn
+- đề xuất nên chọn cái nào
+"""
+            st.write(ask_ai(prompt))
+
+# ======================
+# HIGHLIGHT RISK
+# ======================
+elif mode == "🔍 Highlight điều khoản nguy hiểm":
+
+    file = st.file_uploader("Upload hợp đồng", type=["pdf","docx","txt","png","jpg","jpeg"])
+
+    if file:
+
+        text = read_file(file)
+
+        if st.button("Phân tích sâu"):
+
+            prompt = f"""
+Bạn là luật sư cao cấp.
+
+Hãy:
+- đánh dấu điều khoản nguy hiểm
+- chỉ ra đoạn rủi ro
+- giải thích vì sao nguy hiểm
+- đề xuất sửa lại
+
+HỢP ĐỒNG:
+{text}
+"""
+            st.write(ask_ai(prompt))
