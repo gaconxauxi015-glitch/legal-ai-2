@@ -110,4 +110,4 @@ if mode == "Tạo hợp đồng":
     desc = st.text_area("Mô tả hợp đồng")
     if st.button("Tạo"):
         st.write(create_contract(desc))o"):
-        st.write(create_contract(desc))
+     
